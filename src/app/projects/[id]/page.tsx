@@ -20,7 +20,7 @@ import {
   Trash2,
   Edit,
 } from "lucide-react";
-import React, { useEffect, useState, useActionState } from "react";
+import React, { useEffect, useState, useActionState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import {
   Dialog,
@@ -162,22 +162,26 @@ function CreatePhaseDialog({
 
 function PhaseRow({ phase, onPhaseDeleted }: { phase: Phase, onPhaseDeleted: (phaseId: string) => void }) {
     const { toast } = useToast();
+    const [isDeleting, startDeleteTransition] = useTransition();
+
 
     const handleDelete = async () => {
-        try {
-            await deletePhase(phase.projectId, phase.id);
-            onPhaseDeleted(phase.id);
-            toast({
-                title: 'Success',
-                description: 'Phase deleted successfully.'
-            })
-        } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Failed to delete phase.'
-            })
-        }
+        startDeleteTransition(async () => {
+            try {
+                await deletePhase(phase.projectId, phase.id);
+                onPhaseDeleted(phase.id);
+                toast({
+                    title: 'Success',
+                    description: 'Phase deleted successfully.'
+                })
+            } catch (error) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Error',
+                    description: 'Failed to delete phase.'
+                })
+            }
+        });
     };
 
   return (
@@ -186,6 +190,7 @@ function PhaseRow({ phase, onPhaseDeleted }: { phase: Phase, onPhaseDeleted: (ph
       <TableCell>{phase.startDate}</TableCell>
       <TableCell>{phase.endDate}</TableCell>
       <TableCell className="text-right">
+      <AlertDialog>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -212,11 +217,12 @@ function PhaseRow({ phase, onPhaseDeleted }: { phase: Phase, onPhaseDeleted: (ph
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
-                    Delete
+                <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
+        </AlertDialog>
       </TableCell>
     </TableRow>
   );
@@ -269,7 +275,6 @@ export default function ProjectDetailPage({
     <SidebarInset>
       <Header />
       <main className="flex-1 p-4 md:p-6 lg:p-8">
-      <AlertDialog>
         <div className="mx-auto max-w-6xl">
           <div className="mb-8">
             <Button variant="ghost" asChild className="mb-4">
@@ -331,7 +336,6 @@ export default function ProjectDetailPage({
             </CardContent>
           </Card>
         </div>
-        </AlertDialog>
       </main>
     </SidebarInset>
   );

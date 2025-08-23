@@ -34,9 +34,9 @@ export type Collection = z.infer<typeof CollectionSchema>;
 export const PhaseSchema = z.object({
     id: z.string(),
     projectId: z.string(),
-    name: z.string(),
-    startDate: z.string(),
-    endDate: z.string(),
+    name: z.string().min(1, { message: "Phase name is required." }),
+    startDate: z.string().min(1, { message: "Start date is required." }),
+    endDate: z.string().min(1, { message: "End date is required." }),
     ownerId: z.string(),
 });
   
@@ -44,7 +44,7 @@ export type Phase = z.infer<typeof PhaseSchema>;
 
 export const ProjectSchema = z.object({
     id: z.string(),
-    name: z.string(),
+    name: z.string().min(1, { message: "Project name is required." }),
     description: z.string().optional(),
     ownerId: z.string(),
     isShared: z.boolean().default(false),
