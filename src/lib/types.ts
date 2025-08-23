@@ -30,3 +30,11 @@ export const CollectionSchema = z.object({
 });
 
 export type Collection = z.infer<typeof CollectionSchema>;
+
+export const LinkedEntitySchema = z.object({
+    id: z.string(),
+    type: z.enum(['collection', 'project', 'task']),
+    linkedAt: z.date(),
+});
+
+export type LinkedEntity = z.infer<typeof LinkedEntitySchema>;

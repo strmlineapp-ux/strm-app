@@ -10,17 +10,23 @@ import {
   query,
   where,
   writeBatch,
+  documentId,
+  setDoc,
 } from 'firebase/firestore';
-import type { Collection, Label } from './types';
+import type { Collection, Label, LinkedEntity } from './types';
 
 // In a real app, you'd get this from the logged-in user's auth state
 const MOCK_USER_ID = 'user1';
 
 // Collection references
 const collectionsRef = collection(db, 'collections');
+const getUsersRef = () => collection(db, 'users');
 
 const getLabelsRef = (collectionId: string) =>
   collection(db, `collections/${collectionId}/labels`);
+
+const getLinkedEntitiesRef = (userId: string) =>
+    collection(db, `users/${userId}/linkedEntities`);
 
 // Helper to convert a Firestore doc to a typed object
 function docToType<T>(document: any): T {
@@ -32,11 +38,17 @@ function docToType<T>(document: any): T {
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  // In a real app, you might query for collections owned by the user
-  // or shared with them. For now, we fetch all.
-  const snapshot = await getDocs(collectionsRef);
+  const q = query(collectionsRef, where("ownerId", "==", MOCK_USER_ID));
+  const snapshot = await getDocs(q);
   return snapshot.docs.map(d => docToType<Collection>(d));
 }
+
+export async function getSharedCollections(): Promise<Collection[]> {
+    const q = query(collectionsRef, where("isShared", "==", true));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => docToType<Collection>(d));
+}
+
 
 export async function getCollectionById(id: string): Promise<Collection | undefined> {
     const collectionDoc = doc(db, "collections", id);
@@ -56,11 +68,10 @@ export async function getCollectionById(id: string): Promise<Collection | undefi
 }
 
 export async function createCollection(data: Pick<Collection, 'name' | 'description'>): Promise<string> {
-  const newCollection: Omit<Collection, 'id'> = {
+  const newCollection: Omit<Collection, 'id' | 'labels'> = {
     ...data,
     ownerId: MOCK_USER_ID, // Replace with actual user ID from auth
     isShared: false,
-    labels: [],
   };
   const docRef = await addDoc(collectionsRef, newCollection);
   return docRef.id;
@@ -111,4 +122,43 @@ export async function deleteLabel(collectionId: string, labelId: string): Promis
     const labelDoc = doc(db, `collections/${collectionId}/labels`, labelId);
     // Add security rules for this
     await deleteDoc(labelDoc);
+}
+
+export async function linkCollection(userId: string, collectionId: string): Promise<void> {
+    const linkDocRef = doc(getLinkedEntitiesRef(userId), collectionId);
+    await setDoc(linkDocRef, { type: "collection", linkedAt: new Date() });
+}
+
+export async function unlinkCollection(userId: string, collectionId: string): Promise<void> {
+    const linkDocRef = doc(getLinkedEntitiesRef(userId), collectionId);
+    await deleteDoc(linkDocRef);
+}
+
+export async function getLinkedCollectionIds(userId: string): Promise<string[]> {
+    const q = query(getLinkedEntitiesRef(userId), where("type", "==", "collection"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(d => d.id);
+}
+
+export async function getDashboardCollections(userId: string): Promise<(Collection & { isLinked?: boolean })[]> {
+    const ownedCollectionsQuery = query(collectionsRef, where("ownerId", "==", userId));
+    const linkedCollectionIds = await getLinkedCollectionIds(userId);
+
+    const ownedPromise = getDocs(ownedCollectionsQuery).then(snap => snap.docs.map(d => docToType<Collection>(d)));
+
+    let linkedPromise: Promise<Collection[]> = Promise.resolve([]);
+    if (linkedCollectionIds.length > 0) {
+        const linkedCollectionsQuery = query(collectionsRef, where(documentId(), "in", linkedCollectionIds));
+        linkedPromise = getDocs(linkedCollectionsQuery).then(snap => snap.docs.map(d => docToType<Collection>(d)));
+    }
+    
+    const [ownedCollections, linkedCollections] = await Promise.all([ownedPromise, linkedPromise]);
+
+    const linkedCollectionsWithFlag = linkedCollections.map(c => ({...c, isLinked: true}));
+
+    // In case a user links their own collection, filter out duplicates
+    const ownedIds = new Set(ownedCollections.map(c => c.id));
+    const uniqueLinked = linkedCollectionsWithFlag.filter(c => !ownedIds.has(c.id));
+
+    return [...ownedCollections, ...uniqueLinked];
 }

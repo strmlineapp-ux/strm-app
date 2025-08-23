@@ -1,13 +1,13 @@
-import Dashboard from "@/components/dashboard";
 import Header from "@/components/layout/header";
+import MeetingNotesAnalyzer from "@/components/meeting-notes-analyzer";
 import { SidebarInset } from "@/components/ui/sidebar";
 
-export default function HomePage() {
+export default function AnalysisPage() {
   return (
     <SidebarInset>
       <Header />
       <main className="flex-1 p-4 md:p-6 lg:p-8">
-        <Dashboard />
+        <MeetingNotesAnalyzer />
       </main>
     </SidebarInset>
   );

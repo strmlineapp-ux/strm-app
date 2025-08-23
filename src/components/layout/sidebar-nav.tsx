@@ -21,6 +21,7 @@ import {
   Settings,
   Users,
   Library,
+  Share2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,8 +29,17 @@ import { usePathname } from "next/navigation";
 const SidebarNav = () => {
   const pathname = usePathname();
 
-  const menuItems = [
-    { href: "/#dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  const mainNav = [
+    { href: "/", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/analysis", icon: NotebookPen, label: "Analysis" },
+  ];
+
+  const secondaryNav = [
+    { href: "/collections", icon: Library, label: "My Collections" },
+    { href: "/shared", icon: Share2, label: "Shared" },
+  ];
+
+  const projectNav = [
     { href: "/#projects", icon: FolderKanban, label: "Projects" },
     { href: "/#calendar", icon: Calendar, label: "Calendar" },
     { href: "/#tasks", icon: ListTodo, label: "Tasks" },
@@ -37,12 +47,6 @@ const SidebarNav = () => {
     { href: "/#team", icon: Users, label: "Team" },
   ];
 
-  const collectionsItem = {
-    href: "/collections",
-    icon: Library,
-    label: "Collections",
-  };
-  const analysisItem = { href: "/", icon: NotebookPen, label: "Analysis" };
   const settingsItem = {
     href: "/#settings",
     icon: Settings,
@@ -67,43 +71,45 @@ const SidebarNav = () => {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive(analysisItem.href)}
-              tooltip={{
-                children: analysisItem.label,
-                side: "right",
-                align: "center",
-              }}
-            >
-              <Link href={analysisItem.href}>
-                <analysisItem.icon />
-                <span>{analysisItem.label}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive(collectionsItem.href)}
-              tooltip={{
-                children: collectionsItem.label,
-                side: "right",
-                align: "center",
-              }}
-            >
-              <Link href={collectionsItem.href}>
-                <collectionsItem.icon />
-                <span>{collectionsItem.label}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
+          {mainNav.map((item) => (
+            <SidebarMenuItem key={item.label}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive(item.href)}
+                tooltip={{
+                  children: item.label,
+                  side: "right",
+                  align: "center",
+                }}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
           <SidebarSeparator />
-
-          {menuItems.map((item) => (
+          {secondaryNav.map((item) => (
+            <SidebarMenuItem key={item.label}>
+              <SidebarMenuButton
+                asChild
+                isActive={isActive(item.href)}
+                tooltip={{
+                  children: item.label,
+                  side: "right",
+                  align: "center",
+                }}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+          <SidebarSeparator />
+          {projectNav.map((item) => (
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
                 asChild
