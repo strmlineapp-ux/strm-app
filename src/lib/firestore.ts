@@ -13,7 +13,7 @@ import {
   documentId,
   setDoc,
 } from 'firebase/firestore';
-import type { Collection, Label, LinkedEntity, Phase, Project } from './types';
+import type { Collection, Event, Label, LinkedEntity, Phase, Project } from './types';
 
 // In a real app, you'd get this from the logged-in user's auth state
 const MOCK_USER_ID = 'user1';
@@ -28,6 +28,9 @@ const getLabelsRef = (collectionId: string) =>
 
 const getPhasesRef = (projectId: string) =>
     collection(db, `projects/${projectId}/phases`);
+
+const getEventsRef = (projectId: string) =>
+    collection(db, `projects/${projectId}/events`);
 
 const getLinkedEntitiesRef = (userId: string) =>
     collection(db, `users/${userId}/linkedEntities`);
@@ -127,11 +130,14 @@ export async function getProjectById(id: string): Promise<Project | undefined> {
     const phasesSnapshot = await getDocs(getPhasesRef(id));
     projectData.phases = phasesSnapshot.docs.map(d => docToType<Phase>(d));
 
+    const eventsSnapshot = await getDocs(getEventsRef(id));
+    projectData.events = eventsSnapshot.docs.map(d => docToType<Event>(d));
+
     return projectData;
 }
 
 export async function createProject(data: Pick<Project, 'name' | 'description'>): Promise<string> {
-    const newProject: Omit<Project, 'id' | 'phases'> = {
+    const newProject: Omit<Project, 'id' | 'phases' | 'events'> = {
       ...data,
       ownerId: MOCK_USER_ID,
       isShared: false,
@@ -147,13 +153,21 @@ export async function createProject(data: Pick<Project, 'name' | 'description'>)
   
   export async function deleteProject(id: string): Promise<void> {
     const projectDoc = doc(db, "projects", id);
-    // Also delete subcollections like phases
+    
+    const batch = writeBatch(db);
+    
     const phasesRef = getPhasesRef(id);
     const phasesSnapshot = await getDocs(phasesRef);
-    const batch = writeBatch(db);
     phasesSnapshot.forEach(doc => {
         batch.delete(doc.ref);
     });
+
+    const eventsRef = getEventsRef(id);
+    const eventsSnapshot = await getDocs(eventsRef);
+    eventsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    })
+
     await batch.commit();
 
     await deleteDoc(projectDoc);
@@ -203,6 +217,27 @@ export async function deletePhase(projectId: string, phaseId: string): Promise<v
     await deleteDoc(phaseDoc);
 }
 
+// Events
+export async function createEvent(data: Omit<Event, 'id' | 'ownerId'>): Promise<string> {
+    const newEvent = {
+        ...data,
+        ownerId: MOCK_USER_ID,
+    };
+    const eventsRef = getEventsRef(data.projectId);
+    const docRef = await addDoc(eventsRef, newEvent);
+    return docRef.id;
+}
+
+export async function updateEvent(projectId: string, eventId: string, data: Partial<Event>): Promise<void> {
+    const eventDoc = doc(db, `projects/${projectId}/events`, eventId);
+    await updateDoc(eventDoc, data);
+}
+
+export async function deleteEvent(projectId: string, eventId: string): Promise<void> {
+    const eventDoc = doc(db, `projects/${projectId}/events`, eventId);
+    await deleteDoc(eventDoc);
+}
+
 // Linking
 export async function linkEntity(userId: string, entityId: string, type: 'collection' | 'project'): Promise<void> {
     const linkDocRef = doc(getLinkedEntitiesRef(userId), entityId);
@@ -211,7 +246,7 @@ export async function linkEntity(userId: string, entityId: string, type: 'collec
 
 export async function unlinkEntity(userId: string, entityId: string): Promise<void> {
     const linkDocRef = doc(getLinkedEntitiesRef(userId), entityId);
-    await deleteDoc(linkDocRef);
+await deleteDoc(linkDocRef);
 }
 
 export async function getLinkedEntityIds(userId: string, type: 'collection' | 'project'): Promise<string[]> {
@@ -266,14 +301,4 @@ export async function getDashboardData(userId: string): Promise<{
         collections: [...ownedCollections, ...uniqueLinkedCollections],
         projects: [...ownedProjects, ...uniqueLinkedProjects],
     };
-}
-
-// These are old functions that are now replaced by more generic ones or combined.
-// I'm keeping them here for reference to avoid breaking existing code, but they should be phased out.
-export const linkCollection = (userId: string, collectionId: string) => linkEntity(userId, collectionId, 'collection');
-export const unlinkCollection = (userId: string, collectionId: string) => unlinkEntity(userId, collectionId);
-export const getLinkedCollectionIds = (userId: string) => getLinkedEntityIds(userId, 'collection');
-export async function getDashboardCollections(userId: string): Promise<(Collection & { isLinked?: boolean })[]> {
-    const { collections } = await getDashboardData(userId);
-    return collections;
 }

@@ -39,8 +39,24 @@ export const PhaseSchema = z.object({
     endDate: z.string().min(1, { message: "End date is required." }),
     ownerId: z.string(),
 });
-  
+
 export type Phase = z.infer<typeof PhaseSchema>;
+
+export const EventSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  name: z.string().min(1, { message: "Event name is required." }),
+  startDate: z.string().min(1, { message: "Start date is required." }),
+  endDate: z.string().min(1, { message: "End date is required." }),
+  location: z.string().optional(),
+  guestEmails: z.array(z.string()).optional(),
+  googleEventId: z.string().optional(),
+  ownerId: z.string(),
+  isShared: z.boolean().default(false),
+  labels: z.record(z.string()).optional(),
+});
+
+export type Event = z.infer<typeof EventSchema>;
 
 export const ProjectSchema = z.object({
     id: z.string(),
@@ -49,6 +65,7 @@ export const ProjectSchema = z.object({
     ownerId: z.string(),
     isShared: z.boolean().default(false),
     phases: z.array(PhaseSchema).optional(),
+    events: z.array(EventSchema).optional(),
 });
 
 export type Project = z.infer<typeof ProjectSchema>;

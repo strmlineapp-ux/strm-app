@@ -5,8 +5,8 @@ import {
   AnalyzeMeetingNotesOutput,
 } from "@/ai/flows/analyze-meeting-notes";
 import { z } from "zod";
-import { createCollection, createLabel, createPhase, createProject } from "./firestore";
-import { CollectionSchema, LabelSchema, PhaseSchema, ProjectSchema }from "./types";
+import { createCollection, createLabel, createPhase, createProject, createEvent, updateEvent } from "./firestore";
+import { CollectionSchema, EventSchema, LabelSchema, PhaseSchema, ProjectSchema }from "./types";
 import { revalidatePath } from "next/cache";
 
 const analyzeInputSchema = z.object({
@@ -172,5 +172,53 @@ export async function createPhaseAction(prevState: any, formData: FormData): Pro
     } catch (e) {
         console.error(e);
         return { message: "Failed to create phase", error: "An unexpected error occurred." };
+    }
+}
+
+const EventFormSchema = EventSchema.pick({
+    projectId: true,
+    name: true,
+    startDate: true,
+    endDate: true,
+    location: true,
+}).extend({
+    guestEmails: z.string().optional(),
+});
+
+
+export async function upsertEventAction(prevState: any, formData: FormData): Promise<FormState> {
+    const eventId = formData.get('eventId') as string | null;
+
+    const validatedFields = EventFormSchema.safeParse({
+        projectId: formData.get('projectId'),
+        name: formData.get('name'),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+        location: formData.get('location'),
+        guestEmails: formData.get('guestEmails'),
+    });
+
+
+    if (!validatedFields.success) {
+        return {
+            message: "Validation failed",
+            errors: validatedFields.error.flatten().fieldErrors,
+        }
+    }
+
+    const { guestEmails, ...eventData } = validatedFields.data;
+    const guestEmailsArray = guestEmails ? guestEmails.split(',').map(e => e.trim()).filter(e => e) : [];
+
+    try {
+        if (eventId) {
+            await updateEvent(validatedFields.data.projectId, eventId, { ...eventData, guestEmails: guestEmailsArray });
+        } else {
+            await createEvent({ ...eventData, guestEmails: guestEmailsArray });
+        }
+        revalidatePath(`/projects/${validatedFields.data.projectId}`);
+        return { message: eventId ? "Event updated" : "Event created" };
+    } catch (e) {
+        console.error(e);
+        return { message: `Failed to ${eventId ? 'update' : 'create'} event`, error: "An unexpected error occurred." };
     }
 }
