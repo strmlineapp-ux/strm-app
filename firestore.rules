@@ -2,69 +2,67 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper Functions
+  
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function isOwner(docData) {
+      return request.auth.uid == docData.ownerId;
+    }
+    
     function isAdmin() {
-      // Assumes an 'isAdmin' flag on the user's document
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      // This is a placeholder for admin logic.
+      // In a real app, check for a custom claim: request.auth.token.admin == true
+      // or check a document in a dedicated 'admins' collection.
+      return false; 
     }
 
-    function isOwner(resource) {
-      return request.auth.uid == resource.data.ownerId;
-    }
-
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // USERS
-    // Users can read/write their own document. Admins can read any.
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow read, update, delete: if request.auth.uid == userId || isAdmin();
-      allow create: if isAuthenticated();
-
-      // LINKED ENTITIES
-      // Users can manage their own linked entities. Admins can read.
+      allow read, write: if request.auth.uid == userId || isAdmin();
+      
+      // Rules for 'linkedEntities' sub-collection
       match /linkedEntities/{entityId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+        allow read, create, delete: if request.auth.uid == userId || isAdmin();
+        // No updates allowed, linking/unlinking is create/delete
       }
     }
 
-    // COLLECTIONS
-    // - Read allowed if shared, owned, or admin.
-    // - CUD allowed if owned or admin.
+    // Rules for top-level 'collections'
     match /collections/{collectionId} {
-      allow read: if isAuthenticated() && (resource.data.isShared == true || isOwner(resource) || isAdmin());
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (isOwner(resource) || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.isShared == true || isOwner(resource.data) || isAdmin());
+      allow update, delete: if isAuthenticated() && (isOwner(resource.data) || isAdmin());
 
-      // LABELS (sub-collection of Collections)
-      // Inherits permissions from the parent collection.
+      // Rules for 'labels' sub-collection
       match /labels/{labelId} {
-         allow read: if isAuthenticated() && (get(resource.parent.parent).data.isShared == true || isOwner(get(resource.parent.parent)) || isAdmin());
-         allow create, update, delete: if isAuthenticated() && (isOwner(get(resource.parent.parent)) || isAdmin());
+        allow create: if isAuthenticated() && (get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId == request.auth.uid || isAdmin());
+        allow read: if isAuthenticated() && (get(/databases/$(database)/documents/collections/$(collectionId)).data.isShared == true || get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId == request.auth.uid || isAdmin());
+        allow update, delete: if isAuthenticated() && (get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId == request.auth.uid || isAdmin());
       }
     }
 
-    // PROJECTS
-    // - Read allowed if shared, owned, or admin.
-    // - CUD allowed if owned or admin.
+    // Rules for top-level 'projects'
     match /projects/{projectId} {
-      allow read: if isAuthenticated() && (resource.data.isShared == true || isOwner(resource) || isAdmin());
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (isOwner(resource) || isAdmin());
+        allow create: if isAuthenticated();
+        allow read: if isAuthenticated() && (resource.data.isShared == true || isOwner(resource.data) || isAdmin());
+        allow update, delete: if isAuthenticated() && (isOwner(resource.data) || isAdmin());
 
-       // PHASES & EVENTS (sub-collections of Projects)
-      // Inherit permissions from the parent project.
-      match /{subcollection}/{docId} {
-         allow read: if isAuthenticated() && (get(resource.parent.parent).data.isShared == true || isOwner(get(resource.parent.parent)) || isAdmin());
-         allow create, update, delete: if isAuthenticated() && (isOwner(get(resource.parent.parent)) || isAdmin());
-      }
+        // Rules for 'phases' sub-collection
+        match /phases/{phaseId} {
+            allow create: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+            allow read: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.isShared == true || get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+            allow update, delete: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+        }
+
+        // Rules for 'events' sub-collection
+        match /events/{eventId} {
+            allow create: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+            allow read: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.isShared == true || get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+            allow update, delete: if isAuthenticated() && (get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid || isAdmin());
+        }
     }
   }
 }
