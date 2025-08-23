@@ -8,6 +8,7 @@ import { z } from "zod";
 import { createCollection, createLabel, createPhase, createProject, createEvent, updateEvent } from "./firestore";
 import { CollectionSchema, EventSchema, LabelSchema, PhaseSchema, ProjectSchema }from "./types";
 import { revalidatePath } from "next/cache";
+import { getAuthenticatedUser } from "./auth";
 
 const analyzeInputSchema = z.object({
   meetingNotes: z
@@ -52,81 +53,93 @@ export async function analyzeMeetingNotesAction(
   }
 }
 
-export async function createCollectionAction(prevState: any, formData: FormData): Promise<FormState> {
-    const validatedFields = CollectionSchema.pick({ name: true, description: true }).safeParse({
-        name: formData.get("name"),
-        description: formData.get("description"),
-    });
-
-    if (!validatedFields.success) {
-        return {
-            message: "Validation failed",
-            errors: validatedFields.error.flatten().fieldErrors,
-        }
+async function requireAuth() {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+        throw new Error("Authentication required");
     }
+    return user;
+}
 
+
+export async function createCollectionAction(prevState: any, formData: FormData): Promise<FormState> {
     try {
-        await createCollection(validatedFields.data);
+        const user = await requireAuth();
+        const validatedFields = CollectionSchema.pick({ name: true, description: true }).safeParse({
+            name: formData.get("name"),
+            description: formData.get("description"),
+        });
+
+        if (!validatedFields.success) {
+            return {
+                message: "Validation failed",
+                errors: validatedFields.error.flatten().fieldErrors,
+            }
+        }
+
+        await createCollection(user.uid, validatedFields.data);
         revalidatePath("/collections");
         return { message: "Collection created" };
     } catch (e) {
         console.error(e);
-        return { message: "Failed to create collection", error: "An unexpected error occurred." };
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        return { message: "Failed to create collection", error: errorMessage };
     }
 }
 
 export async function createProjectAction(prevState: any, formData: FormData): Promise<FormState> {
-    const validatedFields = ProjectSchema.pick({ name: true, description: true }).safeParse({
-        name: formData.get("name"),
-        description: formData.get("description"),
-    });
-
-    if (!validatedFields.success) {
-        return {
-            message: "Validation failed",
-            errors: validatedFields.error.flatten().fieldErrors,
-        }
-    }
-
     try {
-        await createProject(validatedFields.data);
+        const user = await requireAuth();
+        const validatedFields = ProjectSchema.pick({ name: true, description: true }).safeParse({
+            name: formData.get("name"),
+            description: formData.get("description"),
+        });
+
+        if (!validatedFields.success) {
+            return {
+                message: "Validation failed",
+                errors: validatedFields.error.flatten().fieldErrors,
+            }
+        }
+        await createProject(user.uid, validatedFields.data);
         revalidatePath("/projects");
         return { message: "Project created" };
     } catch (e) {
         console.error(e);
-        return { message: "Failed to create project", error: "An unexpected error occurred." };
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        return { message: "Failed to create project", error: errorMessage };
     }
 }
 
 export async function createLabelAction(prevState: any, formData: FormData): Promise<FormState> {
-    const validatedFields = LabelSchema.pick({
-        collectionId: true,
-        name: true,
-        description: true,
-        color: true,
-        icon: true,
-    }).extend({
-        assignPermissions: z.string()
-    }).safeParse({
-        collectionId: formData.get('collectionId'),
-        name: formData.get('name'),
-        description: formData.get('description'),
-        color: formData.get('color'),
-        icon: formData.get('icon'),
-        assignPermissions: formData.get('assignPermissions'),
-    });
-
-    if (!validatedFields.success) {
-        console.log(validatedFields.error.flatten().fieldErrors);
-        return {
-            message: "Validation failed",
-            errors: validatedFields.error.flatten().fieldErrors,
-        }
-    }
-
     try {
+        const user = await requireAuth();
+        const validatedFields = LabelSchema.pick({
+            collectionId: true,
+            name: true,
+            description: true,
+            color: true,
+            icon: true,
+        }).extend({
+            assignPermissions: z.string()
+        }).safeParse({
+            collectionId: formData.get('collectionId'),
+            name: formData.get('name'),
+            description: formData.get('description'),
+            color: formData.get('color'),
+            icon: formData.get('icon'),
+            assignPermissions: formData.get('assignPermissions'),
+        });
+
+        if (!validatedFields.success) {
+            console.log(validatedFields.error.flatten().fieldErrors);
+            return {
+                message: "Validation failed",
+                errors: validatedFields.error.flatten().fieldErrors,
+            }
+        }
         const { collectionId, name, description, color, icon, assignPermissions } = validatedFields.data;
-        await createLabel({
+        await createLabel(user.uid, {
             collectionId,
             name,
             description,
@@ -140,38 +153,41 @@ export async function createLabelAction(prevState: any, formData: FormData): Pro
         return { message: "Label created" };
     } catch (e) {
         console.error(e);
-        return { message: "Failed to create label", error: "An unexpected error occurred." };
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        return { message: "Failed to create label", error: errorMessage };
     }
 }
 
 export async function createPhaseAction(prevState: any, formData: FormData): Promise<FormState> {
-    const validatedFields = PhaseSchema.pick({
-        projectId: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-    }).safeParse({
-        projectId: formData.get('projectId'),
-        name: formData.get('name'),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-    });
-
-    if (!validatedFields.success) {
-        console.log(validatedFields.error.flatten().fieldErrors);
-        return {
-            message: "Validation failed",
-            errors: validatedFields.error.flatten().fieldErrors,
-        }
-    }
-
     try {
-        await createPhase(validatedFields.data);
+        const user = await requireAuth();
+        const validatedFields = PhaseSchema.pick({
+            projectId: true,
+            name: true,
+            startDate: true,
+            endDate: true,
+        }).safeParse({
+            projectId: formData.get('projectId'),
+            name: formData.get('name'),
+            startDate: formData.get('startDate'),
+            endDate: formData.get('endDate'),
+        });
+
+        if (!validatedFields.success) {
+            console.log(validatedFields.error.flatten().fieldErrors);
+            return {
+                message: "Validation failed",
+                errors: validatedFields.error.flatten().fieldErrors,
+            }
+        }
+
+        await createPhase(user.uid, validatedFields.data);
         revalidatePath(`/projects/${validatedFields.data.projectId}`);
         return { message: "Phase created" };
     } catch (e) {
         console.error(e);
-        return { message: "Failed to create phase", error: "An unexpected error occurred." };
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        return { message: "Failed to create phase", error: errorMessage };
     }
 }
 
@@ -187,38 +203,40 @@ const EventFormSchema = EventSchema.pick({
 
 
 export async function upsertEventAction(prevState: any, formData: FormData): Promise<FormState> {
-    const eventId = formData.get('eventId') as string | null;
-
-    const validatedFields = EventFormSchema.safeParse({
-        projectId: formData.get('projectId'),
-        name: formData.get('name'),
-        startDate: formData.get('startDate'),
-        endDate: formData.get('endDate'),
-        location: formData.get('location'),
-        guestEmails: formData.get('guestEmails'),
-    });
-
-
-    if (!validatedFields.success) {
-        return {
-            message: "Validation failed",
-            errors: validatedFields.error.flatten().fieldErrors,
-        }
-    }
-
-    const { guestEmails, ...eventData } = validatedFields.data;
-    const guestEmailsArray = guestEmails ? guestEmails.split(',').map(e => e.trim()).filter(e => e) : [];
-
     try {
+        const user = await requireAuth();
+        const eventId = formData.get('eventId') as string | null;
+
+        const validatedFields = EventFormSchema.safeParse({
+            projectId: formData.get('projectId'),
+            name: formData.get('name'),
+            startDate: formData.get('startDate'),
+            endDate: formData.get('endDate'),
+            location: formData.get('location'),
+            guestEmails: formData.get('guestEmails'),
+        });
+
+
+        if (!validatedFields.success) {
+            return {
+                message: "Validation failed",
+                errors: validatedFields.error.flatten().fieldErrors,
+            }
+        }
+
+        const { guestEmails, ...eventData } = validatedFields.data;
+        const guestEmailsArray = guestEmails ? guestEmails.split(',').map(e => e.trim()).filter(e => e) : [];
+
         if (eventId) {
             await updateEvent(validatedFields.data.projectId, eventId, { ...eventData, guestEmails: guestEmailsArray });
         } else {
-            await createEvent({ ...eventData, guestEmails: guestEmailsArray });
+            await createEvent(user.uid, { ...eventData, guestEmails: guestEmailsArray });
         }
         revalidatePath(`/projects/${validatedFields.data.projectId}`);
         return { message: eventId ? "Event updated" : "Event created" };
     } catch (e) {
         console.error(e);
-        return { message: `Failed to ${eventId ? 'update' : 'create'} event`, error: "An unexpected error occurred." };
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        return { message: `Failed to ${eventId ? 'update' : 'create'} event`, error: errorMessage };
     }
 }

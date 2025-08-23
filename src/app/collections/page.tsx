@@ -37,6 +37,7 @@ import { useFormStatus } from "react-dom";
 import { createCollectionAction } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/context/user-context";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -169,20 +170,26 @@ function CollectionCard({ collection }: { collection: Collection }) {
 }
 
 export default function CollectionsPage() {
+  const { user, loading: userLoading } = useUser();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
   useEffect(() => {
+    if (userLoading || !user) {
+        if (!userLoading) setIsLoading(false);
+        return;
+    }
     const fetchCollections = async () => {
       setIsLoading(true);
-      const collectionsData = await getCollections();
+      const collectionsData = await getCollections(user.uid);
       setCollections(collectionsData);
       setIsLoading(false);
     };
     fetchCollections();
-  }, [openCreateDialog]);
+  }, [user, userLoading, openCreateDialog]);
 
+  const isLoadingData = isLoading || userLoading;
 
   return (
     <SidebarInset>
@@ -198,11 +205,13 @@ export default function CollectionsPage() {
                 Manage your shared and personal collections of labels.
               </p>
             </div>
-            <CreateCollectionDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}/>
+            { user && <CreateCollectionDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog}/> }
           </div>
-            {isLoading ? (
+            {isLoadingData ? (
                 <p>Loading collections...</p>
-            ) : (
+            ) : !user ? (
+                <p>Please sign in to view your collections.</p>
+            ): (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {collections.map((collection) => (
                     <CollectionCard key={collection.id} collection={collection} />

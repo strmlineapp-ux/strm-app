@@ -1,65 +1,70 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper functions
+    
+    // --- Helper Functions ---
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isOwner(resource) {
-      return request.auth.uid == resource.data.ownerId;
+    function isOwner(docData) {
+      return isAuthenticated() && request.auth.uid == docData.ownerId;
     }
 
-    // In a real app, you would check for an admin custom claim.
-    // function isAdmin() {
-    //   return request.auth.token.admin == true;
-    // }
-
-    // For now, we'll check a field on the user document.
-     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-
-    // Collections and their labels
-    match /collections/{collectionId} {
-      allow read: if isAuthenticated() && (isOwner(resource) || resource.data.isShared == true || isAdmin());
-      allow write: if isAuthenticated() && (isOwner(resource) || isAdmin());
-
-      // Labels sub-collection
-      match /labels/{labelId} {
-        allow read: if isAuthenticated() && (get(parent).data.isShared == true || isOwner(get(parent)) || isAdmin());
-        allow write: if isAuthenticated() && (isOwner(get(parent)) || isAdmin());
-      }
-    }
-
-    // Projects and their sub-collections
-    match /projects/{projectId} {
-      allow read: if isAuthenticated() && (isOwner(resource) || resource.data.isShared == true || isAdmin());
-      allow write: if isAuthenticated() && (isOwner(resource) || isAdmin());
-
-      // Phases sub-collection
-      match /phases/{phaseId} {
-         allow read: if isAuthenticated() && (isOwner(get(parent)) || get(parent).data.isShared == true || isAdmin());
-         allow write: if isAuthenticated() && (isOwner(get(parent)) || isAdmin());
-      }
-      
-      // Events sub-collection
-      match /events/{eventId} {
-         allow read: if isAuthenticated() && (isOwner(get(parent)) || get(parent).data.isShared == true || isAdmin());
-         allow write: if isAuthenticated() && (isOwner(get(parent)) || isAdmin());
-      }
+    function isAdmin() {
+      // Check for a specific role or field in the user's document
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    // User documents and their linked entities
+    // --- Top-Level Collection Rules ---
+    
+    // The users collection is a core part of authentication and permissions
+    // A user can read their own document, and can create a new document for themselves on first login.
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId || isAdmin();
-      
-      // LinkedEntities sub-collection
-      match /linkedEntities/{entityId} {
-      	allow read, write: if request.auth.uid == userId || isAdmin();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(resource.data) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // This rule applies to all other top-level collections (companies, projects, pages, teams, collections, labels, eventTemplates, assets, deliverables)
+    match /{collectionName}/{docId} {
+      // Admins have full access
+      allow read, write: if isAdmin();
+
+      // Owners have full access to their own documents
+      allow read, write: if isOwner(resource.data);
+
+      // Anyone can create a new document if they are authenticated
+      allow create: if isAuthenticated();
+
+      // Allow any authenticated user to read shared documents
+      allow read: if isAuthenticated() && resource.data.isShared == true;
+    }
+    
+    // --- Sub-Collection Rules ---
+
+    // This rule applies to linked entities under a user's document
+    match /users/{userId}/linkedEntities/{entityId} {
+        allow read, write: if request.auth.uid == userId;
+    }
+    
+    // This rule applies to collections' sub-collections (e.g., linkedAssets)
+    match /collections/{collectionId}/{subCollectionName}/{docId} {
+      // Admins and collection owners have full access to sub-collections
+      allow read, write: if isAdmin() || isOwner(get(/databases/$(database)/documents/collections/$(collectionId)).data);
+    }
+    
+    // This rule applies to projects' sub-collections (phases, events, tasks, etc.)
+    match /projects/{projectId}/{subCollectionName}/{docId} {
+      // Admins have full access
+      allow read, write: if isAdmin();
+
+      // Anyone who is a member of the project has full access
+      function isProjectMember() {
+        return get(/databases/$(database)/documents/projects/$(projectId)).data.memberIds.hasAny([request.auth.uid]);
       }
+      allow read, write: if isProjectMember();
     }
   }
 }

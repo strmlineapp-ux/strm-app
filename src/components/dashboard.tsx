@@ -15,8 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Link2, Library, FolderKanban, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/context/user-context";
 
-const MOCK_USER_ID = "user1";
 
 function DashboardCollectionCard({
   collection,
@@ -83,6 +83,7 @@ function DashboardProjectCard({
 }
 
 export default function Dashboard() {
+  const { user, loading: userLoading } = useUser();
   const [data, setData] = useState<{
     collections: (Collection & { isLinked?: boolean })[],
     projects: (Project & { isLinked?: boolean })[],
@@ -91,10 +92,16 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   useEffect(() => {
+    if (userLoading) return;
+    if (!user) {
+        setIsLoading(false);
+        return;
+    };
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const dashboardData = await getDashboardData(MOCK_USER_ID);
+        const dashboardData = await getDashboardData(user.uid);
         setData(dashboardData);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
@@ -108,7 +115,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [user, userLoading, toast]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-12">
@@ -121,10 +128,15 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {isLoading ? (
+      {isLoading || userLoading ? (
         <div className="flex items-center justify-center p-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             <span className="ml-4 text-muted-foreground">Loading your dashboard...</span>
+        </div>
+      ) : !user ? (
+        <div className="text-center text-muted-foreground p-8 border-dashed border-2 rounded-lg">
+            <h3 className="mt-4 text-lg font-semibold">Welcome to Strm_</h3>
+            <p className="mt-1 text-sm">Please sign in to view your dashboard.</p>
         </div>
       ) : (
         <>

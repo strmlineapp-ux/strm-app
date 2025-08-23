@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import SidebarNav from "@/components/layout/sidebar-nav";
+import { UserProvider } from "@/context/user-context";
 
 export const metadata: Metadata = {
   title: "Strm_",
@@ -30,10 +31,12 @@ export default function RootLayout({
         />
       </head>
       <body className={cn("font-body antialiased")}>
-        <SidebarProvider>
-          <SidebarNav />
-          {children}
-        </SidebarProvider>
+        <UserProvider>
+          <SidebarProvider>
+            <SidebarNav />
+            {children}
+          </SidebarProvider>
+        </UserProvider>
         <Toaster />
       </body>
     </html>

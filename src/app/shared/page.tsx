@@ -25,22 +25,21 @@ import Link from "next/link";
 import { Link2, Link2Off, Loader2, Library, FolderKanban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const MOCK_USER_ID = "user1";
+import { useUser } from "@/context/user-context";
 
 function SharedCollectionCard({
   collection,
   isLinked,
   onLinkToggle,
   isToggling,
+  isOwner,
 }: {
   collection: Collection;
   isLinked: boolean;
   onLinkToggle: (collectionId: string, type: 'collection') => void;
   isToggling: boolean;
+  isOwner: boolean;
 }) {
-  const isOwner = collection.ownerId === MOCK_USER_ID;
-
   return (
     <Card>
       <CardHeader>
@@ -96,14 +95,14 @@ function SharedProjectCard({
     isLinked,
     onLinkToggle,
     isToggling,
+    isOwner,
   }: {
     project: Project;
     isLinked: boolean;
     onLinkToggle: (projectId: string, type: 'project') => void;
     isToggling: boolean;
+    isOwner: boolean;
   }) {
-    const isOwner = project.ownerId === MOCK_USER_ID;
-  
     return (
       <Card>
         <CardHeader>
@@ -155,6 +154,7 @@ function SharedProjectCard({
   }
 
 export default function SharedPage() {
+  const { user, loading: userLoading } = useUser();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [linkedIds, setLinkedIds] = useState<Set<string>>(new Set());
@@ -162,44 +162,50 @@ export default function SharedPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchAllData = async () => {
-    setIsLoading(true);
-    try {
-      const [
-        sharedCollections,
-        sharedProjects,
-        linkedCollectionIds,
-        linkedProjectIds,
-      ] = await Promise.all([
-        getSharedCollections(),
-        getSharedProjects(),
-        getLinkedEntityIds(MOCK_USER_ID, 'collection'),
-        getLinkedEntityIds(MOCK_USER_ID, 'project'),
-      ]);
-      setCollections(sharedCollections);
-      setProjects(sharedProjects);
-      setLinkedIds(new Set([...linkedCollectionIds, ...linkedProjectIds]));
-    } catch (error) {
-      console.error("Failed to fetch shared data:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not load shared items.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    if (userLoading || !user) {
+        if (!userLoading) setIsLoading(false);
+        return;
+    };
+
+    const fetchAllData = async () => {
+        setIsLoading(true);
+        try {
+          const [
+            sharedCollections,
+            sharedProjects,
+            linkedCollectionIds,
+            linkedProjectIds,
+          ] = await Promise.all([
+            getSharedCollections(),
+            getSharedProjects(),
+            getLinkedEntityIds(user.uid, 'collection'),
+            getLinkedEntityIds(user.uid, 'project'),
+          ]);
+          setCollections(sharedCollections);
+          setProjects(sharedProjects);
+          setLinkedIds(new Set([...linkedCollectionIds, ...linkedProjectIds]));
+        } catch (error) {
+          console.error("Failed to fetch shared data:", error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not load shared items.",
+          });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
     fetchAllData();
-  }, []);
+  }, [user, userLoading, toast]);
 
   const handleLinkToggle = async (entityId: string, type: 'collection' | 'project') => {
+    if (!user) return;
     setTogglingId(entityId);
     try {
       if (linkedIds.has(entityId)) {
-        await unlinkEntity(MOCK_USER_ID, entityId);
+        await unlinkEntity(user.uid, entityId);
         setLinkedIds((prev) => {
           const newSet = new Set(prev);
           newSet.delete(entityId);
@@ -207,7 +213,7 @@ export default function SharedPage() {
         });
         toast({ title: "Success", description: `${type.charAt(0).toUpperCase() + type.slice(1)} unlinked.` });
       } else {
-        await linkEntity(MOCK_USER_ID, entityId, type);
+        await linkEntity(user.uid, entityId, type);
         setLinkedIds((prev) => new Set(prev).add(entityId));
         toast({ title: "Success", description: `${type.charAt(0).toUpperCase() + type.slice(1)} linked.` });
       }
@@ -222,6 +228,8 @@ export default function SharedPage() {
       setTogglingId(null);
     }
   };
+  
+  const isLoadingData = isLoading || userLoading;
 
   return (
     <SidebarInset>
@@ -237,52 +245,61 @@ export default function SharedPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="collections">
-            <TabsList className="mb-6">
-                <TabsTrigger value="collections">
-                    <Library className="mr-2"/>
-                    Collections ({collections.length})
-                </TabsTrigger>
-                <TabsTrigger value="projects">
-                    <FolderKanban className="mr-2"/>
-                    Projects ({projects.length})
-                </TabsTrigger>
-            </TabsList>
-            <TabsContent value="collections">
-                {isLoading ? (
-                    <p>Loading shared collections...</p>
-                ) : (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {collections.map((collection) => (
-                        <SharedCollectionCard
-                        key={collection.id}
-                        collection={collection}
-                        isLinked={linkedIds.has(collection.id)}
-                        onLinkToggle={handleLinkToggle}
-                        isToggling={togglingId === collection.id}
-                        />
-                    ))}
-                    </div>
-                )}
-            </TabsContent>
-            <TabsContent value="projects">
-                {isLoading ? (
-                    <p>Loading shared projects...</p>
-                ) : (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
-                        <SharedProjectCard
-                        key={project.id}
-                        project={project}
-                        isLinked={linkedIds.has(project.id)}
-                        onLinkToggle={handleLinkToggle}
-                        isToggling={togglingId === project.id}
-                        />
-                    ))}
-                    </div>
-                )}
-            </TabsContent>
-          </Tabs>
+          { !user && !isLoadingData ? (
+             <div className="text-center text-muted-foreground p-8 border-dashed border-2 rounded-lg">
+                <h3 className="mt-4 text-lg font-semibold">Please sign in</h3>
+                <p className="mt-1 text-sm">Sign in to view and link shared items.</p>
+            </div>
+          ) : (
+            <Tabs defaultValue="collections">
+                <TabsList className="mb-6">
+                    <TabsTrigger value="collections">
+                        <Library className="mr-2"/>
+                        Collections ({collections.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="projects">
+                        <FolderKanban className="mr-2"/>
+                        Projects ({projects.length})
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="collections">
+                    {isLoadingData ? (
+                        <p>Loading shared collections...</p>
+                    ) : (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {collections.map((collection) => (
+                            <SharedCollectionCard
+                            key={collection.id}
+                            collection={collection}
+                            isLinked={linkedIds.has(collection.id)}
+                            onLinkToggle={handleLinkToggle}
+                            isToggling={togglingId === collection.id}
+                            isOwner={collection.ownerId === user?.uid}
+                            />
+                        ))}
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="projects">
+                    {isLoadingData ? (
+                        <p>Loading shared projects...</p>
+                    ) : (
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {projects.map((project) => (
+                            <SharedProjectCard
+                            key={project.id}
+                            project={project}
+                            isLinked={linkedIds.has(project.id)}
+                            onLinkToggle={handleLinkToggle}
+                            isToggling={togglingId === project.id}
+                            isOwner={project.ownerId === user?.uid}
+                            />
+                        ))}
+                        </div>
+                    )}
+                </TabsContent>
+            </Tabs>
+          )}
         </div>
       </main>
     </SidebarInset>

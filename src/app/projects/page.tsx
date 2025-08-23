@@ -1,4 +1,3 @@
-
 "use client";
 import Header from "@/components/layout/header";
 import { SidebarInset } from "@/components/ui/sidebar";
@@ -50,7 +49,7 @@ import { createProjectAction } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-
+import { useUser } from "@/context/user-context";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -238,29 +237,37 @@ function ProjectCard({ project, onProjectDeleted }: { project: Project, onProjec
 }
 
 export default function ProjectsPage() {
+  const { user, loading: userLoading } = useUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
 
-  const fetchProjects = async () => {
-    setIsLoading(true);
-    const projectsData = await getProjects();
-    setProjects(projectsData);
-    setIsLoading(false);
-  };
-
   useEffect(() => {
+    if (userLoading || !user) {
+        if (!userLoading) setIsLoading(false);
+        return;
+    }
+    const fetchProjects = async () => {
+        setIsLoading(true);
+        const projectsData = await getProjects(user.uid);
+        setProjects(projectsData);
+        setIsLoading(false);
+    };
     fetchProjects();
-  }, []);
+  }, [user, userLoading]);
 
   const handleProjectCreated = () => {
     setOpenCreateDialog(false);
-    fetchProjects();
+    if (user) {
+        getProjects(user.uid).then(setProjects);
+    }
   }
 
   const handleProjectDeleted = (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
   }
+
+  const isLoadingData = isLoading || userLoading;
 
 
   return (
@@ -278,11 +285,13 @@ export default function ProjectsPage() {
                 Manage your personal projects.
               </p>
             </div>
-            <CreateProjectDialog open={openCreateDialog} onOpenChange={ (isOpen) => { setOpenCreateDialog(isOpen); if (!isOpen) fetchProjects(); }}/>
+            { user && <CreateProjectDialog open={openCreateDialog} onOpenChange={ (isOpen) => { setOpenCreateDialog(isOpen); if (!isOpen) handleProjectCreated(); }}/> }
           </div>
-            {isLoading ? (
+            {isLoadingData ? (
                 <p>Loading projects...</p>
-            ) : (
+            ) : !user ? (
+                <p>Please sign in to view your projects.</p>
+            ): (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {projects.map((project) => (
                     <ProjectCard key={project.id} project={project} onProjectDeleted={handleProjectDeleted} />

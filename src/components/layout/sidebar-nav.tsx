@@ -25,9 +25,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser } from "@/context/user-context";
 
 const SidebarNav = () => {
   const pathname = usePathname();
+  const { user, loading } = useUser();
 
   const mainNav = [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -148,22 +150,34 @@ const SidebarNav = () => {
         </SidebarMenu>
         <SidebarSeparator />
         <div className="flex items-center gap-3 p-2">
-          <Avatar className="size-8">
-            <AvatarImage
-              src="https://placehold.co/100x100.png"
-              alt="User"
-              data-ai-hint="person face"
-            />
-            <AvatarFallback>AU</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-medium text-foreground">
-              Admin User
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              admin@strm.co
-            </span>
-          </div>
+          {loading ? (
+             <Avatar className="size-8 bg-muted rounded-full" />
+          ) : user ? (
+            <>
+            <Avatar className="size-8">
+              <AvatarImage
+                src={user.photoURL || "https://placehold.co/100x100.png"}
+                alt={user.displayName || "User"}
+                data-ai-hint="person face"
+              />
+              <AvatarFallback>{user.displayName?.charAt(0).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
+              <span className="truncate text-sm font-medium text-foreground">
+                {user.displayName}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {user.email}
+              </span>
+            </div>
+            </>
+          ) : (
+            <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
+                 <span className="truncate text-sm font-medium text-foreground">
+                    Not Signed In
+                 </span>
+            </div>
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>

@@ -75,3 +75,14 @@ export const LinkedEntitySchema = z.object({
 });
 
 export type LinkedEntity = z.infer<typeof LinkedEntitySchema>;
+
+export const UserSchema = z.object({
+    uid: z.string(),
+    email: z.string(),
+    displayName: z.string(),
+    photoURL: z.string().optional(),
+    status: z.enum(['pending', 'active', 'disabled']),
+    isAdmin: z.boolean().default(false),
+})
+
+export type User = z.infer<typeof UserSchema>;

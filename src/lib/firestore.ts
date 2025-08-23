@@ -13,15 +13,13 @@ import {
   documentId,
   setDoc,
 } from 'firebase/firestore';
-import type { Collection, Event, Label, LinkedEntity, Phase, Project } from './types';
+import type { Collection, Event, Label, LinkedEntity, Phase, Project, User } from './types';
 
-// In a real app, you'd get this from the logged-in user's auth state
-const MOCK_USER_ID = 'user1';
 
 // Collection references
 const collectionsRef = collection(db, 'collections');
 const projectsRef = collection(db, 'projects');
-const getUsersRef = () => collection(db, 'users');
+const usersRef = collection(db, 'users');
 
 const getLabelsRef = (collectionId: string) =>
   collection(db, `collections/${collectionId}/labels`);
@@ -44,9 +42,28 @@ function docToType<T>(document: any): T {
     } as T;
 }
 
+
+// Users
+export async function getUserById(uid: string): Promise<User | null> {
+    const userDocRef = doc(db, "users", uid);
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+        return docToType<User>(docSnap);
+    }
+    return null;
+}
+
+export async function createUser(uid: string, data: Omit<User, 'uid' | 'status'>): Promise<void> {
+    const userDocRef = doc(db, "users", uid);
+    await setDoc(userDocRef, {
+        ...data,
+        status: "pending",
+    });
+}
+
 // Collections
-export async function getCollections(): Promise<Collection[]> {
-  const q = query(collectionsRef, where("ownerId", "==", MOCK_USER_ID));
+export async function getCollections(userId: string): Promise<Collection[]> {
+  const q = query(collectionsRef, where("ownerId", "==", userId));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(d => docToType<Collection>(d));
 }
@@ -74,10 +91,10 @@ export async function getCollectionById(id: string): Promise<Collection | undefi
     return collectionData;
 }
 
-export async function createCollection(data: Pick<Collection, 'name' | 'description'>): Promise<string> {
+export async function createCollection(userId: string, data: Pick<Collection, 'name' | 'description'>): Promise<string> {
   const newCollection: Omit<Collection, 'id' | 'labels'> = {
     ...data,
-    ownerId: MOCK_USER_ID,
+    ownerId: userId,
     isShared: false,
   };
   const docRef = await addDoc(collectionsRef, newCollection);
@@ -105,8 +122,8 @@ export async function deleteCollection(id: string): Promise<void> {
 }
 
 // Projects
-export async function getProjects(): Promise<Project[]> {
-    const q = query(projectsRef, where("ownerId", "==", MOCK_USER_ID));
+export async function getProjects(userId: string): Promise<Project[]> {
+    const q = query(projectsRef, where("ownerId", "==", userId));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(d => docToType<Project>(d));
 }
@@ -136,10 +153,10 @@ export async function getProjectById(id: string): Promise<Project | undefined> {
     return projectData;
 }
 
-export async function createProject(data: Pick<Project, 'name' | 'description'>): Promise<string> {
+export async function createProject(userId: string, data: Pick<Project, 'name' | 'description'>): Promise<string> {
     const newProject: Omit<Project, 'id' | 'phases' | 'events'> = {
       ...data,
-      ownerId: MOCK_USER_ID,
+      ownerId: userId,
       isShared: false,
     };
     const docRef = await addDoc(projectsRef, newProject);
@@ -175,10 +192,10 @@ export async function createProject(data: Pick<Project, 'name' | 'description'>)
 
 
 // Labels
-export async function createLabel(data: Omit<Label, 'id' | 'ownerId'>): Promise<string> {
+export async function createLabel(userId: string, data: Omit<Label, 'id' | 'ownerId'>): Promise<string> {
     const newLabel = {
         ...data,
-        ownerId: MOCK_USER_ID,
+        ownerId: userId,
     };
     const labelsRef = getLabelsRef(data.collectionId);
     const docRef = await addDoc(labelsRef, newLabel);
@@ -197,10 +214,10 @@ export async function deleteLabel(collectionId: string, labelId: string): Promis
 }
 
 // Phases
-export async function createPhase(data: Omit<Phase, 'id' | 'ownerId'>): Promise<string> {
+export async function createPhase(userId: string, data: Omit<Phase, 'id' | 'ownerId'>): Promise<string> {
     const newPhase = {
         ...data,
-        ownerId: MOCK_USER_ID,
+        ownerId: userId,
     };
     const phasesRef = getPhasesRef(data.projectId);
     const docRef = await addDoc(phasesRef, newPhase);
@@ -218,10 +235,10 @@ export async function deletePhase(projectId: string, phaseId: string): Promise<v
 }
 
 // Events
-export async function createEvent(data: Omit<Event, 'id' | 'ownerId'>): Promise<string> {
+export async function createEvent(userId: string, data: Omit<Event, 'id' | 'ownerId'>): Promise<string> {
     const newEvent = {
         ...data,
-        ownerId: MOCK_USER_ID,
+        ownerId: userId,
     };
     const eventsRef = getEventsRef(data.projectId);
     const docRef = await addDoc(eventsRef, newEvent);
