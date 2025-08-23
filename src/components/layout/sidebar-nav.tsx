@@ -20,6 +20,7 @@ import {
   NotebookPen,
   Settings,
   Users,
+  Library,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -36,6 +37,11 @@ const SidebarNav = () => {
     { href: "/#team", icon: Users, label: "Team" },
   ];
 
+  const collectionsItem = {
+    href: "/collections",
+    icon: Library,
+    label: "Collections",
+  };
   const analysisItem = { href: "/", icon: NotebookPen, label: "Analysis" };
   const settingsItem = {
     href: "/#settings",
@@ -74,6 +80,23 @@ const SidebarNav = () => {
               <Link href={analysisItem.href}>
                 <analysisItem.icon />
                 <span>{analysisItem.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive(collectionsItem.href)}
+              tooltip={{
+                children: collectionsItem.label,
+                side: "right",
+                align: "center",
+              }}
+            >
+              <Link href={collectionsItem.href}>
+                <collectionsItem.icon />
+                <span>{collectionsItem.label}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
