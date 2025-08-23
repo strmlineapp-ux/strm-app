@@ -36,7 +36,6 @@ import React, { useEffect, useState, useTransition, useActionState } from "react
 import { useFormStatus } from "react-dom";
 import { createCollectionAction } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
-import { revalidatePath } from "next/cache";
 import { useRouter } from "next/navigation";
 
 function SubmitButton() {

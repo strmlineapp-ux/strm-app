@@ -52,8 +52,6 @@ export const EventSchema = z.object({
   guestEmails: z.array(z.string()).optional(),
   googleEventId: z.string().optional(),
   ownerId: z.string(),
-  isShared: z.boolean().default(false),
-  labels: z.record(z.string()).optional(),
 });
 
 export type Event = z.infer<typeof EventSchema>;
