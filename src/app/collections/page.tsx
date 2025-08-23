@@ -32,25 +32,25 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import React, { useEffect, useState, useTransition } from "react";
-import { useFormState } from "react-dom";
+import React, { useEffect, useState, useTransition, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { createCollectionAction } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { revalidatePath } from "next/cache";
 import { useRouter } from "next/navigation";
 
 function SubmitButton() {
-  const [isPending, startTransition] = useTransition();
+  const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={isPending}>
-      {isPending ? "Creating..." : "Create Collection"}
+    <Button type="submit" disabled={pending}>
+      {pending ? "Creating..." : "Create Collection"}
     </Button>
   );
 }
 
 function CreateCollectionDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
-  const [state, formAction] = useFormState(createCollectionAction, {
+  const [state, formAction] = useActionState(createCollectionAction, {
     message: "",
   });
 

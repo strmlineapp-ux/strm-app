@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useEffect, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { analyzeMeetingNotesAction, FormState } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -164,7 +164,7 @@ function AnalysisSection({ formState }: { formState: FormState }) {
 
 export default function MeetingNotesAnalyzer() {
   const initialState: FormState = { message: "" };
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     analyzeMeetingNotesAction,
     initialState
   );

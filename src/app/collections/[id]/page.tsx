@@ -45,18 +45,17 @@ import {
   PlusCircle,
   GripVertical,
 } from "lucide-react";
-import React, { useEffect, useState, useTransition } from "react";
-import { useFormState } from "react-dom";
+import React, { useEffect, useState, useTransition, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { createLabelAction } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 
 function SubmitButton() {
     const [isPending, startTransition] = useTransition();
-    // This is a workaround to use useFormStatus in a client component
-    const formStatus = (typeof window !== 'undefined') ? require('react-dom').useFormStatus() : { pending: false };
+    const { pending } = useFormStatus();
     return (
-      <Button type="submit" disabled={formStatus.pending}>
-        {formStatus.pending ? "Creating..." : "Create Label"}
+      <Button type="submit" disabled={pending}>
+        {pending ? "Creating..." : "Create Label"}
       </Button>
     );
   }
@@ -64,8 +63,7 @@ function SubmitButton() {
 function CreateLabelDialog({ collectionId, open, onOpenChange }: { collectionId: string, open: boolean, onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const initialState = { message: "", collectionId };
-  const createLabelWithId = createLabelAction.bind(null);
-  const [state, formAction] = useFormState(createLabelAction, initialState);
+  const [state, formAction] = useActionState(createLabelAction, initialState);
 
   useEffect(() => {
     if (state.message) {
