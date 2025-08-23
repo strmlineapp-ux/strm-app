@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Helper function to check if a user is an admin
+    function isAdmin(userId) {
+      // In a real app, you might check for a custom claim on the user's auth token
+      // or look up their role in a separate 'users' collection.
+      // For example: return get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true;
+      return false; // Placeholder
+    }
+
+    match /collections/{collectionId} {
+      // READ:
+      // Allow read if the document is shared (isShared == true)
+      // OR if the user is the owner
+      // OR if the user is an admin
+      allow read: if request.auth != null && (resource.data.isShared == true || request.auth.uid == resource.data.ownerId || isAdmin(request.auth.uid));
+      
+      // CREATE:
+      // Allow create if the user is authenticated and the incoming document's ownerId matches their UID.
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      
+      // UPDATE, DELETE:
+      // Allow update/delete if the user is the owner
+      // OR if the user is an admin
+      allow update, delete: if request.auth != null && (request.auth.uid == resource.data.ownerId || isAdmin(request.auth.uid));
+
+      // Nested 'labels' subcollection rules
+      match /labels/{labelId} {
+        // READ:
+        // Inherit read access from the parent collection.
+        // If a user can read the collection, they can read its labels.
+        allow read: if request.auth != null && (get(/databases/$(database)/documents/collections/$(collectionId)).data.isShared == true || request.auth.uid == get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId || isAdmin(request.auth.uid));
+
+        // CREATE:
+        // Allow label creation if the user is the owner of the parent collection
+        // OR if the user is an admin
+        allow create: if request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId || isAdmin(request.auth.uid));
+
+        // UPDATE, DELETE:
+        // Allow update/delete on a label if the user is the owner of the parent collection
+        // OR if the user is an admin
+        allow update, delete: if request.auth != null && (request.auth.uid == get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId || isAdmin(request.auth.uid));
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+"use client";
 import Header from "@/components/layout/header";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { getCollectionById } from "@/lib/firestore";
@@ -36,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/lib/types";
+import { Label, Collection } from "@/lib/types";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -44,10 +45,48 @@ import {
   PlusCircle,
   GripVertical,
 } from "lucide-react";
+import React, { useEffect, useState, useTransition } from "react";
+import { useFormState } from "react-dom";
+import { createLabelAction } from "@/lib/actions";
+import { useToast } from "@/hooks/use-toast";
 
-function CreateLabelDialog() {
+function SubmitButton() {
+    const [isPending, startTransition] = useTransition();
+    // This is a workaround to use useFormStatus in a client component
+    const formStatus = (typeof window !== 'undefined') ? require('react-dom').useFormStatus() : { pending: false };
+    return (
+      <Button type="submit" disabled={formStatus.pending}>
+        {formStatus.pending ? "Creating..." : "Create Label"}
+      </Button>
+    );
+  }
+
+function CreateLabelDialog({ collectionId, open, onOpenChange }: { collectionId: string, open: boolean, onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const initialState = { message: "", collectionId };
+  const createLabelWithId = createLabelAction.bind(null);
+  const [state, formAction] = useFormState(createLabelAction, initialState);
+
+  useEffect(() => {
+    if (state.message) {
+      if (state.error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: state.error,
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: state.message,
+        });
+        onOpenChange(false);
+      }
+    }
+  }, [state, toast, onOpenChange]);
+
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <PlusCircle className="mr-2" />
@@ -55,55 +94,74 @@ function CreateLabelDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[525px]">
-        <DialogHeader>
-          <DialogTitle>Create New Label</DialogTitle>
-          <DialogDescription>
-            Labels help you categorize and organize your items.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <UiLabel htmlFor="name" className="text-right">
-              Name
-            </UiLabel>
-            <Input id="name" defaultValue="New Label" className="col-span-3" />
+        <form action={formAction}>
+            <input type="hidden" name="collectionId" value={collectionId} />
+          <DialogHeader>
+            <DialogTitle>Create New Label</DialogTitle>
+            <DialogDescription>
+              Labels help you categorize and organize your items.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <UiLabel htmlFor="name" className="text-right">
+                Name
+              </UiLabel>
+              <Input id="name" name="name" className="col-span-3" required />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <UiLabel htmlFor="description" className="text-right">
+                Description
+              </UiLabel>
+              <Input
+                id="description"
+                name="description"
+                placeholder="A short description"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <UiLabel htmlFor="color" className="text-right">
+                Color
+              </UiLabel>
+              <Input
+                id="color"
+                name="color"
+                type="color"
+                defaultValue="#A9A9A9"
+                className="p-1"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <UiLabel htmlFor="icon" className="text-right">
+                Icon
+              </UiLabel>
+              <Input
+                id="icon"
+                name="icon"
+                placeholder="e.g., 'Tag'"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <UiLabel className="text-right">Permissions</UiLabel>
+              <Select name="assignPermissions" defaultValue="team_admins">
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select who can assign" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anyone">Anyone</SelectItem>
+                  <SelectItem value="specific_users">Specific Users</SelectItem>
+                  <SelectItem value="team_admins">Team Admins</SelectItem>
+                  <SelectItem value="team_members">Team Members</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <UiLabel htmlFor="description" className="text-right">
-              Description
-            </UiLabel>
-            <Input id="description" placeholder="A short description" className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <UiLabel htmlFor="color" className="text-right">
-              Color
-            </UiLabel>
-            <Input id="color" type="color" defaultValue="#A9A9A9" className="p-1" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <UiLabel htmlFor="icon" className="text-right">
-              Icon
-            </UiLabel>
-            <Input id="icon" placeholder="e.g., 'Tag'" className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <UiLabel className="text-right">Permissions</UiLabel>
-            <Select>
-              <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select who can assign" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="anyone">Anyone</SelectItem>
-                <SelectItem value="specific_users">Specific Users</SelectItem>
-                <SelectItem value="team_admins">Team Admins</SelectItem>
-                <SelectItem value="team_members">Team Members</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button type="submit">Create Label</Button>
-        </DialogFooter>
+          <DialogFooter>
+            <SubmitButton />
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -126,7 +184,9 @@ function LabelRow({ label }: { label: Label }) {
       </TableCell>
       <TableCell>{label.description}</TableCell>
       <TableCell>
-        <Badge variant="outline">{label.assignPermissions.type.replace('_', ' ')}</Badge>
+        <Badge variant="outline">
+          {label.assignPermissions.type.replace("_", " ")}
+        </Badge>
       </TableCell>
       <TableCell className="text-right">
         <DropdownMenu>
@@ -148,12 +208,32 @@ function LabelRow({ label }: { label: Label }) {
   );
 }
 
-export default async function CollectionDetailPage({
+export default function CollectionDetailPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const collection = await getCollectionById(params.id);
+  const [collection, setCollection] = useState<Collection | null | undefined>(undefined);
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
+
+  useEffect(() => {
+    const fetchCollection = async () => {
+        const collectionData = await getCollectionById(params.id);
+        setCollection(collectionData);
+    };
+    fetchCollection();
+  }, [params.id, openCreateDialog]);
+
+  if (collection === undefined) {
+    return (
+        <SidebarInset>
+            <Header />
+            <main className="flex-1 p-4 md:p-6 lg:p-8">
+            <p>Loading...</p>
+            </main>
+        </SidebarInset>
+    )
+  }
 
   if (!collection) {
     return (
@@ -171,49 +251,49 @@ export default async function CollectionDetailPage({
       <Header />
       <main className="flex-1 p-4 md:p-6 lg:p-8">
         <div className="mx-auto max-w-6xl">
-            <div className="mb-8">
-                <Button variant="ghost" asChild className="mb-4">
-                    <Link href="/collections">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Collections
-                    </Link>
-                </Button>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-                        {collection.name}
-                        </h1>
-                        <p className="mt-2 text-lg text-muted-foreground">
-                        {collection.description}
-                        </p>
-                    </div>
-                    <CreateLabelDialog />
-                </div>
+          <div className="mb-8">
+            <Button variant="ghost" asChild className="mb-4">
+              <Link href="/collections">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Collections
+              </Link>
+            </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="font-headline text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  {collection.name}
+                </h1>
+                <p className="mt-2 text-lg text-muted-foreground">
+                  {collection.description}
+                </p>
+              </div>
+              <CreateLabelDialog collectionId={params.id} open={openCreateDialog} onOpenChange={setOpenCreateDialog}/>
             </div>
+          </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Labels</CardTitle>
-                </CardHeader>
-                <CardContent>
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead className="w-8"></TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Permissions</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {collection.labels?.map((label) => (
-                            <LabelRow key={label.id} label={label} />
-                        ))}
-                    </TableBody>
-                </Table>
-                </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Labels</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Permissions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {collection.labels?.map((label) => (
+                    <LabelRow key={label.id} label={label} />
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </SidebarInset>
