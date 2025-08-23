@@ -13,7 +13,7 @@ import {
   documentId,
   setDoc,
 } from 'firebase/firestore';
-import type { Collection, Label, LinkedEntity, Project } from './types';
+import type { Collection, Label, LinkedEntity, Phase, Project } from './types';
 
 // In a real app, you'd get this from the logged-in user's auth state
 const MOCK_USER_ID = 'user1';
@@ -25,6 +25,9 @@ const getUsersRef = () => collection(db, 'users');
 
 const getLabelsRef = (collectionId: string) =>
   collection(db, `collections/${collectionId}/labels`);
+
+const getPhasesRef = (projectId: string) =>
+    collection(db, `projects/${projectId}/phases`);
 
 const getLinkedEntitiesRef = (userId: string) =>
     collection(db, `users/${userId}/linkedEntities`);
@@ -114,11 +117,21 @@ export async function getSharedProjects(): Promise<Project[]> {
 export async function getProjectById(id: string): Promise<Project | undefined> {
     const projectDoc = doc(db, "projects", id);
     const snapshot = await getDoc(projectDoc);
-    return snapshot.exists() ? docToType<Project>(snapshot) : undefined;
+    
+    if (!snapshot.exists()) {
+        return undefined;
+    }
+
+    const projectData = docToType<Project>(snapshot);
+
+    const phasesSnapshot = await getDocs(getPhasesRef(id));
+    projectData.phases = phasesSnapshot.docs.map(d => docToType<Phase>(d));
+
+    return projectData;
 }
 
 export async function createProject(data: Pick<Project, 'name' | 'description'>): Promise<string> {
-    const newProject: Omit<Project, 'id'> = {
+    const newProject: Omit<Project, 'id' | 'phases'> = {
       ...data,
       ownerId: MOCK_USER_ID,
       isShared: false,
@@ -133,8 +146,17 @@ export async function createProject(data: Pick<Project, 'name' | 'description'>)
   }
   
   export async function deleteProject(id: string): Promise<void> {
-      const projectDoc = doc(db, "projects", id);
-      await deleteDoc(projectDoc);
+    const projectDoc = doc(db, "projects", id);
+    // Also delete subcollections like phases
+    const phasesRef = getPhasesRef(id);
+    const phasesSnapshot = await getDocs(phasesRef);
+    const batch = writeBatch(db);
+    phasesSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    await deleteDoc(projectDoc);
   }
 
 
@@ -158,6 +180,27 @@ export async function updateLabel(collectionId: string, labelId: string, data: P
 export async function deleteLabel(collectionId: string, labelId: string): Promise<void> {
     const labelDoc = doc(db, `collections/${collectionId}/labels`, labelId);
     await deleteDoc(labelDoc);
+}
+
+// Phases
+export async function createPhase(data: Omit<Phase, 'id' | 'ownerId'>): Promise<string> {
+    const newPhase = {
+        ...data,
+        ownerId: MOCK_USER_ID,
+    };
+    const phasesRef = getPhasesRef(data.projectId);
+    const docRef = await addDoc(phasesRef, newPhase);
+    return docRef.id;
+}
+
+export async function updatePhase(projectId: string, phaseId: string, data: Partial<Phase>): Promise<void> {
+    const phaseDoc = doc(db, `projects/${projectId}/phases`, phaseId);
+    await updateDoc(phaseDoc, data);
+}
+
+export async function deletePhase(projectId: string, phaseId: string): Promise<void> {
+    const phaseDoc = doc(db, `projects/${projectId}/phases`, phaseId);
+    await deleteDoc(phaseDoc);
 }
 
 // Linking

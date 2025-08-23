@@ -5,8 +5,8 @@ import {
   AnalyzeMeetingNotesOutput,
 } from "@/ai/flows/analyze-meeting-notes";
 import { z } from "zod";
-import { createCollection, createLabel, createProject } from "./firestore";
-import { CollectionSchema, LabelSchema, ProjectSchema }from "./types";
+import { createCollection, createLabel, createPhase, createProject } from "./firestore";
+import { CollectionSchema, LabelSchema, PhaseSchema, ProjectSchema }from "./types";
 import { revalidatePath } from "next/cache";
 
 const analyzeInputSchema = z.object({
@@ -52,7 +52,7 @@ export async function analyzeMeetingNotesAction(
   }
 }
 
-export async function createCollectionAction(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function createCollectionAction(prevState: any, formData: FormData): Promise<FormState> {
     const validatedFields = CollectionSchema.pick({ name: true, description: true }).safeParse({
         name: formData.get("name"),
         description: formData.get("description"),
@@ -75,7 +75,7 @@ export async function createCollectionAction(prevState: FormState, formData: For
     }
 }
 
-export async function createProjectAction(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function createProjectAction(prevState: any, formData: FormData): Promise<FormState> {
     const validatedFields = ProjectSchema.pick({ name: true, description: true }).safeParse({
         name: formData.get("name"),
         description: formData.get("description"),
@@ -98,7 +98,7 @@ export async function createProjectAction(prevState: FormState, formData: FormDa
     }
 }
 
-export async function createLabelAction(prevState: FormState, formData: FormData): Promise<FormState> {
+export async function createLabelAction(prevState: any, formData: FormData): Promise<FormState> {
     const validatedFields = LabelSchema.pick({
         collectionId: true,
         name: true,
@@ -141,5 +141,36 @@ export async function createLabelAction(prevState: FormState, formData: FormData
     } catch (e) {
         console.error(e);
         return { message: "Failed to create label", error: "An unexpected error occurred." };
+    }
+}
+
+export async function createPhaseAction(prevState: any, formData: FormData): Promise<FormState> {
+    const validatedFields = PhaseSchema.pick({
+        projectId: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+    }).safeParse({
+        projectId: formData.get('projectId'),
+        name: formData.get('name'),
+        startDate: formData.get('startDate'),
+        endDate: formData.get('endDate'),
+    });
+
+    if (!validatedFields.success) {
+        console.log(validatedFields.error.flatten().fieldErrors);
+        return {
+            message: "Validation failed",
+            errors: validatedFields.error.flatten().fieldErrors,
+        }
+    }
+
+    try {
+        await createPhase(validatedFields.data);
+        revalidatePath(`/projects/${validatedFields.data.projectId}`);
+        return { message: "Phase created" };
+    } catch (e) {
+        console.error(e);
+        return { message: "Failed to create phase", error: "An unexpected error occurred." };
     }
 }
