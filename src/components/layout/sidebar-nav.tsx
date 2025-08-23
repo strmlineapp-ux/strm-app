@@ -36,11 +36,11 @@ const SidebarNav = () => {
 
   const secondaryNav = [
     { href: "/collections", icon: Library, label: "My Collections" },
+    { href: "/projects", icon: FolderKanban, label: "My Projects" },
     { href: "/shared", icon: Share2, label: "Shared" },
   ];
 
   const projectNav = [
-    { href: "/#projects", icon: FolderKanban, label: "Projects" },
     { href: "/#calendar", icon: Calendar, label: "Calendar" },
     { href: "/#tasks", icon: ListTodo, label: "Tasks" },
     { href: "/#files", icon: FileText, label: "Files" },

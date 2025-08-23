@@ -5,48 +5,30 @@ service cloud.firestore {
     
     // Helper function to check for admin role
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
-    }
-    
-    // Helper function to check if the user is the owner
-    function isOwner(resource) {
-      return request.auth.uid == resource.data.ownerId;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Collections
     match /collections/{collectionId} {
-      // READ: 
-      // - Allow if user is owner
-      // - Allow if collection is shared
-      // - Allow if user is an admin
-      allow read: if isOwner(resource) || resource.data.isShared == true || isAdmin();
+      allow read: if request.auth != null && (resource.data.isShared == true || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if request.auth != null && (request.resource.data.ownerId == request.auth.uid || isAdmin());
       
-      // CREATE:
-      // - Allow if user is authenticated and the ownerId matches their UID
-      allow create: if request.auth != null && isOwner(request.resource);
-
-      // UPDATE, DELETE:
-      // - Allow if user is owner
-      // - Allow if user is an admin
-      allow update, delete: if isOwner(resource) || isAdmin();
-
+      // Labels subcollection
       match /labels/{labelId} {
-        // READ: 
-        // - Allow if user can read the parent collection
-        allow read: if get(parent).data.isShared == true || isOwner(get(parent)) || isAdmin();
-
-        // CREATE:
-        // - Allow if user is the owner of the parent collection
-        allow create: if isOwner(get(parent));
-
-        // UPDATE, DELETE:
-        // - Allow if user is the owner of the parent collection
-        allow update, delete: if isOwner(get(parent)) || isAdmin();
+        allow read: if request.auth != null && (get(/databases/$(database)/documents/collections/$(collectionId)).data.isShared == true || get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId == request.auth.uid || isAdmin());
+        allow write: if request.auth != null && (get(/databases/$(database)/documents/collections/$(collectionId)).data.ownerId == request.auth.uid || isAdmin());
       }
     }
-    
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if request.auth != null && (resource.data.isShared == true || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if request.auth != null && (request.resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // User data, including linked entities
     match /users/{userId}/{document=**} {
-    	// Allow users to read and write their own documents
-      allow read, write: if request.auth.uid == userId || isAdmin();
+      allow read, write: if request.auth != null && request.auth.uid == userId || isAdmin();
     }
   }
 }

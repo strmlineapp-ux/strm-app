@@ -31,6 +31,16 @@ export const CollectionSchema = z.object({
 
 export type Collection = z.infer<typeof CollectionSchema>;
 
+export const ProjectSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string().optional(),
+    ownerId: z.string(),
+    isShared: z.boolean().default(false),
+});
+
+export type Project = z.infer<typeof ProjectSchema>;
+
 export const LinkedEntitySchema = z.object({
     id: z.string(),
     type: z.enum(['collection', 'project', 'task']),

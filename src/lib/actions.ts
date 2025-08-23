@@ -5,8 +5,8 @@ import {
   AnalyzeMeetingNotesOutput,
 } from "@/ai/flows/analyze-meeting-notes";
 import { z } from "zod";
-import { createCollection, createLabel } from "./firestore";
-import { CollectionSchema, LabelSchema }from "./types";
+import { createCollection, createLabel, createProject } from "./firestore";
+import { CollectionSchema, LabelSchema, ProjectSchema }from "./types";
 import { revalidatePath } from "next/cache";
 
 const analyzeInputSchema = z.object({
@@ -72,6 +72,29 @@ export async function createCollectionAction(prevState: FormState, formData: For
     } catch (e) {
         console.error(e);
         return { message: "Failed to create collection", error: "An unexpected error occurred." };
+    }
+}
+
+export async function createProjectAction(prevState: FormState, formData: FormData): Promise<FormState> {
+    const validatedFields = ProjectSchema.pick({ name: true, description: true }).safeParse({
+        name: formData.get("name"),
+        description: formData.get("description"),
+    });
+
+    if (!validatedFields.success) {
+        return {
+            message: "Validation failed",
+            errors: validatedFields.error.flatten().fieldErrors,
+        }
+    }
+
+    try {
+        await createProject(validatedFields.data);
+        revalidatePath("/projects");
+        return { message: "Project created" };
+    } catch (e) {
+        console.error(e);
+        return { message: "Failed to create project", error: "An unexpected error occurred." };
     }
 }
 
