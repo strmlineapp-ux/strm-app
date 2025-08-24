@@ -19,7 +19,7 @@ const auth = getAuth(app);
 
 if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
     console.log("Connecting to Firebase emulators");
-    connectAuthEmulator(auth, "http://localhost:9099");
+    // connectAuthEmulator(auth, "http://localhost:9099");
 }
 
 
