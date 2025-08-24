@@ -11,7 +11,7 @@ import type { User } from "./types";
 
 const provider = new GoogleAuthProvider();
 
-export async function signInWithGoogle(): Promise<FirebaseAuthUser> {
+export async function signInWithGoogle(): Promise<FirebaseAuthUser | null> {
     try {
         const result = await signInWithPopup(firebaseAuth, provider);
         const user = result.user;
@@ -31,7 +31,11 @@ export async function signInWithGoogle(): Promise<FirebaseAuthUser> {
             });
         }
         return user;
-    } catch (error) {
+    } catch (error: any) {
+        if (error.code === 'auth/popup-closed-by-user') {
+            console.log("Sign-in popup closed by user.");
+            return null;
+        }
         console.error("Error signing in with Google", error);
         throw error;
     }
